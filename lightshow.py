@@ -6,9 +6,9 @@
 ## Then prints the frequency list.
 
 import alsaaudio, time, audioop
-import pyaudio # from http://people.csail.mit.edu/hubert/pyaudio/
-import serial  # from http://pyserial.sourceforge.net/
-import numpy   # from http://numpy.scipy.org/
+import pyaudio
+import serial
+import numpy
 import sys
 import math
 import struct
@@ -18,28 +18,16 @@ import lightagain
 inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE,alsaaudio.PCM_NONBLOCK)
 #inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE,alsaaudio.PCM_NONBLOCK,device='hw:1,1,0')
 
+rate = 8000
+
 # Set attributes: Mono, 8000 Hz, 16 bit little endian samples
 inp.setchannels(1)
-inp.setrate(8000)
+inp.setrate(rate)
 inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
 
-# The period size controls the internal number of frames per period.
-# The significance of this parameter is documented in the ALSA api.
-# For our purposes, it is suficcient to know that reads from the device
-# will return this many frames. Each frame being 2 bytes long.
-# This means that the reads below will return either 320 bytes of data
-# or 0 bytes of data. The latter is possible because we are in nonblocking
-# mode.
-
-
-#This was 160
 inp.setperiodsize(160)
-chunk      = 2**11 # Change if too fast/slow, never less than 2**11
-scale      = 100   # Change if too dim/bright
-exponent   = 5     # Change if too little/too much difference between loud and quiet sounds
-samplerate = 44100
 
-def calculate_levels(data, chunk, samplerate):
+def calculate_levels(data):
     # Use FFT to calculate volume for each frequency
     global MAX
 
@@ -77,26 +65,24 @@ def thresholder(listy, threshold):
             returnable.append(1)
     return returnable
 
-
+running = 4*[[]]
 
 while True:
     # Read data from device
     l,data = inp.read()
     if l:
         # Return the maximum of the absolute value of all samples in a fragment.
-        levels = calculate_levels(data, chunk, samplerate)
+        levels = calculate_levels(data)
 
         outstr = ''
-        for level in levels:
+        for i in xrange(0,len(levels)):
+            level = levels[i]
             outstr += '% f' % level
             outstr += '\t'
+            running[i].append(level)
+            if len(running[i]) > rate * 10:
+                running[i].pop(0)
         print(outstr)
         time.sleep(0.01)
-        threshold = [1.7 * x for x in [7.0, 5.0, 3.5, 3.0]]
+        threshold = [numpy.mean(ls) for ls in running]
         lightagain.lightSwitch(lightagain.lightMusic(thresholder(levels,threshold)))
-
-
-
-
-
-
