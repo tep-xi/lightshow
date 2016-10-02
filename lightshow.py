@@ -66,7 +66,8 @@ def thresholder(listy, threshold):
     return returnable
 
 running = 4*[[]]
-offset = [7.0, 5.0, 3.0, 3.0]
+offset = [3.0, 0.5, 0.25, 0.0]
+scale = 4*[1.5]
 
 while True:
     # Read data from device
@@ -85,5 +86,5 @@ while True:
                 running[i].pop(0)
         print(outstr)
         time.sleep(0.01)
-        threshold = offset + [numpy.mean(ls) for ls in running]
+        threshold = [offset[i] + scale[i]*numpy.mean(running[i]) for i in xrange(0,len(running))]
         lightagain.lightSwitch(lightagain.lightMusic(thresholder(levels,threshold)))
