@@ -94,22 +94,26 @@ running = 4*[[]]
 offset = [3.0, 0.5, 0.25, 0.0]
 scale = 4*[1.5]
 
-while True:
-    # Read data from device
-    l,data = inp.read()
-    if l:
-        # Return the maximum of the absolute value of all samples in a fragment.
-        levels = calculate_levels(data)
+try:
+    while True:
+        # Read data from device
+        l,data = inp.read()
+        if l:
+            # Return the maximum of the absolute value of all samples in a fragment.
+            levels = calculate_levels(data)
 
-        outstr = ''
-        for i in xrange(0,len(levels)):
-            level = levels[i]
-            outstr += '% f' % level
-            outstr += '\t'
-            running[i].append(level)
-            if len(running[i]) > rate * 10:
-                running[i].pop(0)
-        print(outstr)
-        time.sleep(0.01)
-        threshold = [offset[i] + scale[i]*numpy.mean(running[i]) for i in xrange(0,len(running))]
-        lightSwitch(lightMusic(thresholder(levels,threshold)))
+            outstr = ''
+            for i in xrange(0,len(levels)):
+                level = levels[i]
+                outstr += '% f' % level
+                outstr += '\t'
+                running[i].append(level)
+                if len(running[i]) > rate * 10:
+                    running[i].pop(0)
+            print(outstr)
+            time.sleep(0.01)
+            threshold = [offset[i] + scale[i]*numpy.mean(running[i]) for i in xrange(0,len(running))]
+            lightSwitch(lightMusic(thresholder(levels,threshold)))
+finally:
+    lightSwitch([])
+    ser.close()
