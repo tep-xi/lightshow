@@ -91,8 +91,8 @@ def thresholder(listy, threshold):
     return returnable
 
 running = 4*[[]]
-offset = [3.0, 0.5, 0.25, 0.0]
-scale = 4*[1.5]
+offset = [2.5, 0.5, 0.25, 0.0]
+scale = 4*[1.25]
 
 try:
     while True:
