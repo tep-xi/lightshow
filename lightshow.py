@@ -35,9 +35,9 @@ def lightSwitch(numbers):
 def lightMusic(ls):
     bass = [7, 10, 16, 18, 23, 26, 27, 28]
     midOne = [1, 5, 12, 13, 22]
-    midTwo = [15, 2, 3, 4]
-    high = [14, 17, 21, 25, 31]
-    constant = [29]
+    midTwo = [15, 2, 3, 4, 6]
+    high = [14, 17, 21, 25, 30, 31]
+    constant = [9, 29]
     return (bass * ls[0] + midOne * ls[1] + midTwo * ls[2] + high * ls[3] + constant)
 
 inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE,alsaaudio.PCM_NONBLOCK)
@@ -92,28 +92,29 @@ def thresholder(listy, threshold):
 
 running = 4*[[]]
 offset = [2.5, 0.5, 0.25, 0.0]
-scale = 4*[1.25]
+scale = 4*[1.1]
 
-try:
-    while True:
-        # Read data from device
-        l,data = inp.read()
-        if l:
-            # Return the maximum of the absolute value of all samples in a fragment.
-            levels = calculate_levels(data)
+if __name__ == "__main__":
+    try:
+        while True:
+            # Read data from device
+            l,data = inp.read()
+            if l:
+                # Return the maximum of the absolute value of all samples in a fragment.
+                levels = calculate_levels(data)
 
-            outstr = ''
-            for i in xrange(0,len(levels)):
-                level = levels[i]
-                outstr += '% f' % level
-                outstr += '\t'
-                running[i].append(level)
-                if len(running[i]) > rate * 10:
-                    running[i].pop(0)
-            print(outstr)
-            time.sleep(0.01)
-            threshold = [offset[i] + scale[i]*numpy.mean(running[i]) for i in xrange(0,len(running))]
-            lightSwitch(lightMusic(thresholder(levels,threshold)))
-finally:
-    lightSwitch([])
-    ser.close()
+                outstr = ''
+                for i in xrange(0,len(levels)):
+                    level = levels[i]
+                    outstr += '% f' % level
+                    outstr += '\t'
+                    running[i].append(level)
+                    if len(running[i]) > rate * 10:
+                        running[i].pop(0)
+                print(outstr)
+                time.sleep(0.01)
+                threshold = [offset[i] + scale[i]*numpy.mean(running[i]) for i in xrange(0,len(running))]
+                lightSwitch(lightMusic(thresholder(levels,threshold)))
+    finally:
+        lightSwitch([])
+        ser.close()
