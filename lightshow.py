@@ -33,10 +33,10 @@ def lightSwitch(numbers):
 
 
 def lightMusic(ls):
-    bass = [7, 10, 16, 18, 23, 26, 27, 28]
-    midOne = [1, 5, 12, 13, 22]
-    midTwo = [2, 3, 4, 6, 15, 21, 30]
-    high = [9, 14, 17, 25, 31]
+    bass = [7, 10, 18, 26, 27, 28]
+    midOne = [1, 5, 12, 13, 15, 23, 24]
+    midTwo = [3, 4, 6, 21, 22, 30]
+    high = [2, 9, 14, 16, 17, 25, 31]
     constant = [29]
     return (bass * ls[0] + midOne * ls[1] + midTwo * ls[2] + high * ls[3] + constant)
 
