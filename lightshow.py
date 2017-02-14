@@ -1,23 +1,23 @@
-#!/usr/bin/env python2
-## This is an example of a simple sound capture script.
-##
-## The script opens an ALSA pcm for sound capture. Set
-## various attributes of the capture, and reads in a loop,
-## Then prints the frequency list.
+#!/usr/bin/env python
 
-import alsaaudio, time, audioop
-import pyaudio
+import alsaaudio
 import serial
 import numpy
-import sys
-import math
 import struct
-import serial
-import time
+
+rate = 8000
+framesbackfit = 100
+framesbackavg = 2*rate
+buckets = 4
+fitdeg = 2
+offset = buckets * [0.0]
+scale = [2.0, 2.0, 1.8, 1.6]
+device = 'hw:2,0,0'
+periodsize = 170
 
 ser = serial.Serial('/dev/ttyACM0', 19200, timeout=1)
 
-def lightSwitch(numbers):
+def lightSwitch(numbers=None):
     toSend = [0b00000000, ] * 4
     if numbers:
         for light in numbers:
@@ -40,81 +40,59 @@ def lightMusic(ls):
     constant = [29]
     return (bass * ls[0] + midOne * ls[1] + midTwo * ls[2] + high * ls[3] + constant)
 
-inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE,alsaaudio.PCM_NONBLOCK,device='hw:2,0,0')
-#inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE,alsaaudio.PCM_NONBLOCK,device='hw:1,1,0')
+inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, device=device)
 
-rate = 8000
-
-# Set attributes: Mono, 8000 Hz, 16 bit little endian samples
 inp.setchannels(1)
 inp.setrate(rate)
 inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
 
-inp.setperiodsize(160)
+inp.setperiodsize(periodsize)
 
-def calculate_levels(data):
-    # Use FFT to calculate volume for each frequency
-    global MAX
-
+def calculate_psd(size, rawdata):
     # Convert raw sound data to Numpy array
-    fmt = "%dH" % (len(data) / 2)
-    data2 = struct.unpack(fmt, data)
-    data2 = numpy.array(data2, dtype='h')
+    fmt = "%dH" % size
+    data = numpy.array(struct.unpack(fmt, rawdata), dtype='int16')
 
-    # Apply FFT
-    fourier = numpy.fft.fft(data2)
-    ffty = numpy.abs(fourier[0:len(fourier) / 2]) / 1000
-    ffty1 = ffty[:len(ffty) / 2]
-    ffty2 = ffty[len(ffty) / 2::] + 2
-    ffty2 = ffty2[::-1]
-    #print ffty1
-    ffty = ffty1 + ffty2
-    ffty = numpy.log(ffty) - 2
+    fourierdata = numpy.fft.fft(data)
+    psd = numpy.square(numpy.abs(fourierdata))
 
-    #fourier = list(ffty)[4:-4]
-    fourier = fourier[:len(fourier) / 2]
+    return psd
 
-    size = len(fourier)
-
-    # Add up for 6 lights
-    levels = [sum(fourier[i:(i + size / 4)]) for i in xrange(0, size, size / 4)][:4]
-
-    return levels
-
-def thresholder(listy, threshold):
-    returnable=[]
-    for i in xrange(0,len(listy)):
-        if listy[i] < threshold[i]:
-            returnable.append(0)
-        else:
-            returnable.append(1)
-    return returnable
-
-running = 4*[[]]
-offset = [2.5, .5, .25, 0.0]
-scale = 4*[.25]
+running = numpy.zeros((framesbackfit, buckets))
+runningpd = numpy.zeros((framesbackavg, buckets))
+xvals = numpy.arange(0, framesbackfit*2 - 1) % framesbackfit
 
 if __name__ == "__main__":
     try:
+        j = 0
         while True:
-            # Read data from device
-            l,data = inp.read()
-            if l > 0:
-                # Return the maximum of the absolute value of all samples in a fragment.
-                levels = calculate_levels(data)
+            for i in range(0, framesbackfit):
+                size = 0
+                while size != periodsize:
+                    size, data = inp.read()
+                psd = calculate_psd(size, data)
+                padpsd = numpy.pad(psd, (0, size % buckets), 'constant')
+                levels = numpy.sum(padpsd.reshape((buckets, -1)), axis=1)
+                running[i,:] = levels
+                pd = numpy.polyfit(xvals[i:i+framesbackfit], running, fitdeg)[fitdeg - 1]
+                pospd = numpy.copy(pd)
+                pospd[pospd < 0] = 0
+                runningpd[j,:] = pospd
 
                 outstr = ''
-                for i in xrange(0,len(levels)):
-                    level = levels[i]
-                    outstr += '% f' % level
+                for i in range(0, buckets):
+                    outstr += '% f' % pd[i]
                     outstr += '\t'
-                    running[i].append(level)
-                    if len(running[i]) > rate * 10:
-                        running[i].pop(0)
-                print(outstr)
-                time.sleep(0.01)
-                threshold = [offset[i] + scale[i]*numpy.mean(running[i]) for i in xrange(0,len(running))]
-                lightSwitch(lightMusic(thresholder(levels,threshold)))
+                #print(outstr)
+
+                threshold = offset + scale * numpy.mean(runningpd, axis=0)
+                print(threshold)
+
+                vals = [a < b for (a, b) in zip(threshold, pd)]
+
+                lightSwitch(lightMusic(vals))
+
+                j = (j + 1) % framesbackavg
     finally:
-        lightSwitch([])
+        lightSwitch()
         ser.close()
