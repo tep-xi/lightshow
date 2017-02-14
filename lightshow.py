@@ -40,7 +40,7 @@ def lightMusic(ls):
     constant = [29]
     return (bass * ls[0] + midOne * ls[1] + midTwo * ls[2] + high * ls[3] + constant)
 
-inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE,alsaaudio.PCM_NONBLOCK)
+inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE,alsaaudio.PCM_NONBLOCK,device='hw:2,0,0')
 #inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE,alsaaudio.PCM_NONBLOCK,device='hw:1,1,0')
 
 rate = 8000
@@ -68,10 +68,10 @@ def calculate_levels(data):
     ffty2 = ffty[len(ffty) / 2::] + 2
     ffty2 = ffty2[::-1]
     #print ffty1
-    ffty = ffty1 + ffty2[:-1]
+    ffty = ffty1 + ffty2
     ffty = numpy.log(ffty) - 2
 
-    fourier = list(ffty)[4:-4]
+    #fourier = list(ffty)[4:-4]
     fourier = fourier[:len(fourier) / 2]
 
     size = len(fourier)
@@ -91,15 +91,15 @@ def thresholder(listy, threshold):
     return returnable
 
 running = 4*[[]]
-offset = [2.5, 0.5, 0.25, 0.0]
-scale = 4*[1.1]
+offset = [2.5, .5, .25, 0.0]
+scale = 4*[.25]
 
 if __name__ == "__main__":
     try:
         while True:
             # Read data from device
             l,data = inp.read()
-            if l:
+            if l > 0:
                 # Return the maximum of the absolute value of all samples in a fragment.
                 levels = calculate_levels(data)
 
