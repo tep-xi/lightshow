@@ -78,6 +78,7 @@ xvals = numpy.arange(0, args.periods_fit*2 - 1) % args.periods_fit
 if __name__ == "__main__":
     try:
         j = 0
+        maxlen = 0
         while True:
             for i in range(0, args.periods_fit):
                 size = 0
@@ -94,7 +95,9 @@ if __name__ == "__main__":
 
                 outstr = ''
                 for i in range(0, buckets):
-                    outstr += '%7.0f' % (abs(pd[i]) / 1000)
+                    nextstr = '% *.0f' % (maxlen, pd[i] / 1000)
+                    maxlen = max(maxlen, len(nextstr))
+                    outstr += nextstr
                     outstr += '\t'
                 print(outstr)
 
