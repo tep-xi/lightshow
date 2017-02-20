@@ -12,7 +12,7 @@ buckets = 4
 fitdeg = 2
 offset = buckets * [0.0]
 scale = [2.0, 2.0, 1.8, 1.6]
-device = -1
+device = 'hw:2,0,0'
 periodsize = 170
 
 ser = serial.Serial('/dev/ttyACM0', 19200, timeout=1)
@@ -40,7 +40,7 @@ def lightMusic(ls):
     constant = [29]
     return (bass * ls[0] + midOne * ls[1] + midTwo * ls[2] + high * ls[3] + constant)
 
-inp = alsaaudio.pcms(type=alsaaudio.PCM_CAPTURE)[device]
+inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, card=device)
 
 inp.setchannels(1)
 inp.setrate(rate)
