@@ -20,7 +20,6 @@ parser.add_argument('--offset', metavar='float', nargs=buckets, default=buckets*
 parser.add_argument('--scale', metavar='float', nargs=buckets, default=[2.0, 2.0, 1.8, 1.6], type=float, help='scale for each of the ' + str(buckets) + ' light groupings')
 
 args = parser.parse_args()
-print(args)
 
 if args.serial is not None:
     ser = serial.Serial('/dev/ttyACM0', 19200, timeout=1)
