@@ -4,18 +4,28 @@ import alsaaudio
 import serial
 import numpy
 import struct
+import argparse
 
-rate = 8000
-framesbackfit = 100
-framesbackavg = 2*rate
 buckets = 4
-fitdeg = 2
-offset = buckets * [0.0]
-scale = [2.0, 2.0, 1.8, 1.6]
-device = 'hw:2,0,0'
-periodsize = 170
 
-ser = serial.Serial('/dev/ttyACM0', 19200, timeout=1)
+parser = argparse.ArgumentParser(description='Run the light show.')
+parser.add_argument('-s', '--serial', metavar='ser', default='/dev/ttyACM0', const=None, nargs='?', help='serial device; if called without an argument disables serial')
+parser.add_argument('-d', '--device', metavar='dev', default=None, help='audio input device')
+parser.add_argument('-r', '--rate', metavar='N', default=8000, type=int, help='audio rate')
+parser.add_argument('-p', '--period', metavar='N', default=170, type=int, help='period size for audio input')
+parser.add_argument('--periods-fit', metavar='N', default=100, type=int, help='number of periods back to use for finding the derivative')
+parser.add_argument('--periods-avg', metavar='N', default=16000, type=int, help='number of periods back to use for thresholding')
+parser.add_argument('--fit-degree', metavar='deg', default=2, type=int, help='degree of the fitting polynomial')
+parser.add_argument('--offset', metavar='float', nargs=buckets, default=buckets*[0.0], type=float, help='offset for each of the ' + str(buckets) + ' light groupings')
+parser.add_argument('--scale', metavar='float', nargs=buckets, default=[2.0, 2.0, 1.8, 1.6], type=float, help='scale for each of the ' + str(buckets) + ' light groupings')
+
+args = parser.parse_args()
+print(args)
+
+if args.serial is not None:
+    ser = serial.Serial('/dev/ttyACM0', 19200, timeout=1)
+else:
+    ser = None
 
 def lightSwitch(numbers=None):
     toSend = [0b00000000, ] * 4
@@ -29,7 +39,8 @@ def lightSwitch(numbers=None):
                 toSend = [0b00000000, ] * 4
     else:
         toSend = [0b00000000, ] * 4
-    ser.write(str(bytearray(toSend)))
+    if ser is not None:
+        ser.write(str(bytearray(toSend)))
 
 
 def lightMusic(ls):
@@ -40,13 +51,16 @@ def lightMusic(ls):
     constant = [29]
     return (bass * ls[0] + midOne * ls[1] + midTwo * ls[2] + high * ls[3] + constant)
 
-inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, card=device)
+if args.device is not None:
+    inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, card=device)
+else:
+    inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE)
 
 inp.setchannels(1)
-inp.setrate(rate)
+inp.setrate(args.rate)
 inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
 
-inp.setperiodsize(periodsize)
+inp.setperiodsize(args.period)
 
 def calculate_psd(size, rawdata):
     # Convert raw sound data to Numpy array
@@ -58,41 +72,41 @@ def calculate_psd(size, rawdata):
 
     return psd
 
-running = numpy.zeros((framesbackfit, buckets))
-runningpd = numpy.zeros((framesbackavg, buckets))
-xvals = numpy.arange(0, framesbackfit*2 - 1) % framesbackfit
+running = numpy.zeros((args.periods_fit, buckets))
+runningpd = numpy.zeros((args.periods_avg, buckets))
+xvals = numpy.arange(0, args.periods_fit*2 - 1) % args.periods_fit
 
 if __name__ == "__main__":
     try:
         j = 0
         while True:
-            for i in range(0, framesbackfit):
+            for i in range(0, args.periods_fit):
                 size = 0
-                while size != periodsize:
+                while size != args.period:
                     size, data = inp.read()
                 psd = calculate_psd(size, data)
                 padpsd = numpy.pad(psd, (0, size % buckets), 'constant')
                 levels = numpy.sum(padpsd.reshape((buckets, -1)), axis=1)
                 running[i,:] = levels
-                pd = numpy.polyfit(xvals[i:i+framesbackfit], running, fitdeg)[fitdeg - 1]
+                pd = numpy.polyfit(xvals[i:i+args.periods_fit], running, args.fit_degree)[args.fit_degree - 1]
                 pospd = numpy.copy(pd)
                 pospd[pospd < 0] = 0
                 runningpd[j,:] = pospd
 
                 outstr = ''
                 for i in range(0, buckets):
-                    outstr += '% f' % pd[i]
+                    outstr += '%7.0f' % (abs(pd[i]) / 1000)
                     outstr += '\t'
-                #print(outstr)
+                print(outstr)
 
-                threshold = offset + scale * numpy.mean(runningpd, axis=0)
-                print(threshold)
+                threshold = args.offset + args.scale * numpy.mean(runningpd, axis=0)
 
                 vals = [a < b for (a, b) in zip(threshold, pd)]
 
                 lightSwitch(lightMusic(vals))
 
-                j = (j + 1) % framesbackavg
+                j = (j + 1) % args.periods_avg
     finally:
         lightSwitch()
-        ser.close()
+        if ser is not None:
+            ser.close()
