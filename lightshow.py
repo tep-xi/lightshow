@@ -52,7 +52,7 @@ def lightMusic(ls):
     return (bass * ls[0] + midOne * ls[1] + midTwo * ls[2] + high * ls[3] + constant)
 
 if args.device is not None:
-    inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, card=device)
+    inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, card=args.device)
 else:
     inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE)
 
