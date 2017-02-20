@@ -29,7 +29,7 @@ def lightSwitch(numbers=None):
                 toSend = [0b00000000, ] * 4
     else:
         toSend = [0b00000000, ] * 4
-    ser.write(toSend)
+    ser.write(str(bytearray(toSend)))
 
 
 def lightMusic(ls):
