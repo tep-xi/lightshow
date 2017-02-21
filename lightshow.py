@@ -18,6 +18,7 @@ parser.add_argument('--periods-avg', metavar='N', default=500, type=int, help='n
 parser.add_argument('--fit-degree', metavar='deg', default=2, type=int, help='degree of the fitting polynomial')
 parser.add_argument('--offset', metavar='float', nargs=buckets, default=buckets*[0.0], type=float, help='offset for each of the ' + str(buckets) + ' light groupings')
 parser.add_argument('--scale', metavar='float', nargs=buckets, default=[2.0, 2.0, 1.8, 1.6], type=float, help='scale for each of the ' + str(buckets) + ' light groupings')
+parser.add_argument('-v', '--verbose', dest='verbose', action='store_const', const=True, default=False, help='print debug output')
 
 args = parser.parse_args()
 
@@ -93,13 +94,14 @@ if __name__ == "__main__":
                 pospd[pospd < 0] = 0
                 runningpd[j,:] = pospd
 
-                outstr = ''
-                for i in range(0, buckets):
-                    nextstr = '% *.0f' % (maxlen, pd[i] / 1000)
-                    maxlen = max(maxlen, len(nextstr))
-                    outstr += nextstr
-                    outstr += '\t'
-                print(outstr)
+                if args.verbose:
+                    outstr = ''
+                    for i in range(0, buckets):
+                        nextstr = '% *.0f' % (maxlen, pd[i] / 1000)
+                        maxlen = max(maxlen, len(nextstr))
+                        outstr += nextstr
+                        outstr += '\t'
+                    print(outstr)
 
                 threshold = args.offset + args.scale * numpy.mean(runningpd, axis=0)
 
