@@ -86,7 +86,8 @@ if __name__ == "__main__":
                 while size != args.period:
                     size, data = inp.read()
                 psd = calculate_psd(size, data)
-                padpsd = numpy.pad(psd, (0, size % buckets), 'constant')
+                newlen = (len(psd)*3)//4
+                padpsd = psd[:newlen + buckets - (newlen % buckets)]
                 levels = numpy.sum(padpsd.reshape((buckets, -1)), axis=1)
                 running[i,:] = levels
                 pd = numpy.polyfit(xvals[i:i+args.periods_fit], running, args.fit_degree)[args.fit_degree - 1]
