@@ -5,6 +5,7 @@ import serial
 import numpy
 import struct
 import argparse
+import random
 
 buckets = 2
 
@@ -42,7 +43,6 @@ def lightSwitch(numbers=None):
     if ser is not None:
         ser.write(str(bytearray(toSend)))
 
-
 def lightMusic(ls):
     constant = [29]
     many = [30]
@@ -51,7 +51,7 @@ def lightMusic(ls):
     green = [3, 4, 6, 21, 22, 24]
     blue = [2, 9, 14, 16, 17, 25, 31]
     colors = [many, red, yellow, green, blue]
-    return (constant + [light for (on, lights) in zip(ls, colors) for light in lights if on])
+    return (constant + [light for (f, lights) in zip(ls, colors) for light in f(lights)])
 
 if args.device is not None:
     inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, card=args.device)
@@ -86,6 +86,7 @@ if __name__ == "__main__":
         j = 0
         maxlen = 0
         perm = numpy.random.permutation(4)
+        rand = random.Random()
         while True:
             for i in range(0, args.periods_fit):
                 size = 0
@@ -117,8 +118,18 @@ if __name__ == "__main__":
 
                 if beat:
                     perm = numpy.random.permutation(4)
+                if flair:
+                    rand.seed()
 
-                vals = [beat] + permute([True, flair, False, False], perm)
+                noop = lambda x: x
+                null = lambda x: []
+                def doflair(ls):
+                    st = rand.getstate()
+                    ret = rand.choice(ls)
+                    rand.setstate(st)
+                    return [ret]
+
+                vals = [(noop if beat else null)] + permute([noop, doflair, null, null], perm)
 
                 lightSwitch(lightMusic(vals))
 
