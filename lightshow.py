@@ -6,7 +6,7 @@ import numpy
 import struct
 import argparse
 
-buckets = 4
+buckets = 2
 
 parser = argparse.ArgumentParser(description='Run the light show.')
 parser.add_argument('-s', '--serial', metavar='ser', default='/dev/ttyACM0', const=None, nargs='?', help='serial device; if called without an argument disables serial')
@@ -17,7 +17,7 @@ parser.add_argument('--periods-fit', metavar='N', default=25, type=int, help='nu
 parser.add_argument('--periods-avg', metavar='N', default=500, type=int, help='number of periods back to use for thresholding')
 parser.add_argument('--fit-degree', metavar='deg', default=2, type=int, help='degree of the fitting polynomial')
 parser.add_argument('--offset', metavar='float', nargs=buckets, default=buckets*[0.0], type=float, help='offset for each of the ' + str(buckets) + ' light groupings')
-parser.add_argument('--scale', metavar='float', nargs=buckets, default=[2.0, 2.0, 1.8, 1.6], type=float, help='scale for each of the ' + str(buckets) + ' light groupings')
+parser.add_argument('--scale', metavar='float', nargs=buckets, default=[3.0, 2.0], type=float, help='scale for each of the ' + str(buckets) + ' light groupings')
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_const', const=True, default=False, help='print debug output')
 
 args = parser.parse_args()
@@ -44,12 +44,14 @@ def lightSwitch(numbers=None):
 
 
 def lightMusic(ls):
-    bass = [7, 10, 18, 26, 27, 28]
-    midOne = [1, 5, 12, 13, 15, 23, 30]
-    midTwo = [3, 4, 6, 21, 22, 24]
-    high = [2, 9, 14, 16, 17, 25, 31]
     constant = [29]
-    return (bass * ls[0] + midOne * ls[1] + midTwo * ls[2] + high * ls[3] + constant)
+    many = [30]
+    red = [7, 10, 18, 26, 27, 28]
+    yellow = [1, 5, 12, 13, 15, 23]
+    green = [3, 4, 6, 21, 22, 24]
+    blue = [2, 9, 14, 16, 17, 25, 31]
+    colors = [many, red, yellow, green, blue]
+    return (constant + [light for (on, lights) in zip(ls, colors) for light in lights if on])
 
 if args.device is not None:
     inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, card=args.device)
@@ -72,14 +74,18 @@ def calculate_psd(size, rawdata):
 
     return psd
 
-running = numpy.zeros((args.periods_fit, buckets))
-runningpd = numpy.zeros((args.periods_avg, buckets))
+def permute(ls, perm):
+    return [ls[i] for i in perm]
+
+running = numpy.zeros((args.periods_fit, 2))
+runningpd = numpy.zeros((args.periods_avg, 2))
 xvals = numpy.arange(0, args.periods_fit*2 - 1) % args.periods_fit
 
 if __name__ == "__main__":
     try:
         j = 0
         maxlen = 0
+        perm = numpy.random.permutation(4)
         while True:
             for i in range(0, args.periods_fit):
                 size = 0
@@ -87,8 +93,9 @@ if __name__ == "__main__":
                     size, data = inp.read()
                 psd = calculate_psd(size, data)
                 newlen = (len(psd)*3)//4
-                padpsd = psd[:newlen + buckets - (newlen % buckets)]
-                levels = numpy.sum(padpsd.reshape((buckets, -1)), axis=1)
+                psd = psd[:newlen]
+                basslen = newlen // 4
+                levels = [numpy.sum(ls) for ls in (psd[0:basslen], psd[basslen:])]
                 running[i,:] = levels
                 pd = numpy.polyfit(xvals[i:i+args.periods_fit], running, args.fit_degree)[args.fit_degree - 1]
                 pospd = numpy.copy(pd)
@@ -106,7 +113,12 @@ if __name__ == "__main__":
 
                 threshold = args.offset + args.scale * numpy.mean(runningpd, axis=0)
 
-                vals = [a < b for (a, b) in zip(threshold, pd)]
+                [beat, flair] = [a < b for (a, b) in zip(threshold, pd)]
+
+                if beat:
+                    perm = numpy.random.permutation(4)
+
+                vals = [beat] + permute([True, flair, False, False], perm)
 
                 lightSwitch(lightMusic(vals))
 
