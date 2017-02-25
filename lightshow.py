@@ -24,7 +24,7 @@ parser.add_argument('-v', '--verbose', dest='verbose', action='store_const', con
 args = parser.parse_args()
 
 if args.serial is not None:
-    ser = serial.Serial('/dev/ttyACM0', 19200, timeout=1)
+    ser = serial.Serial(args.serial, 19200, timeout=1)
 else:
     ser = None
 
