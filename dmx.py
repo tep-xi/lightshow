@@ -4,9 +4,9 @@ import socket
 import time
 import math
 
-KINET_MAGIC=chr(0x04)+chr(0x01)+chr(0xdc)+chr(0x4a)
-KINET_VERSION=chr(0x01)+chr(0x00)
-KINET_TYPE_DMXOUT=chr(0x01)+chr(0x01)
+KINET_MAGIC=b"\x04\x01\xdc\x4a"
+KINET_VERSION=b"\x01\x00"
+KINET_TYPE_DMXOUT=b"\x01\x01"
 
 class DmxConnection(object):
     def __init__(self, address, port, dmx_port) :
@@ -16,11 +16,11 @@ class DmxConnection(object):
 
     def send_dmx(self, data) :
         out=KINET_MAGIC+KINET_VERSION+KINET_TYPE_DMXOUT
-        out+=chr(0x00)+chr(0x00)+chr(0x00)+chr(0x00) #seq
-        out+=chr(self.dmx_port) # dmx port number
-        out+=chr(0x00) #flags
-        out+=chr(0x00)+chr(0x00) # timerVal
-        out+=chr(0xFF)+chr(0xFF)+chr(0xFF)+chr(0xFF) # uni
+        out+=b"\x00\x00\x00\x00" #seq
+        out+=chr(self.dmx_port).encode('utf-8') # dmx port number
+        out+=b"\x00" #flags
+        out+=b"\x00\x00" # timerVal
+        out+=b"\xFF\xFF\xFF\xFF" # uni
         out+=data
         if(len(out)!=self.sock.send(out)) :
             print("socket problem")
@@ -31,11 +31,11 @@ class sPDS480caConnection(object):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         self.sock.connect((address, 6038))
         self.universe = universe
-        self.magic = ("\x04\x01\xdc\x4a" # magic number
-                      +"\x01\x00" # kk version
-                      +"\x08\x01"
-                      +"\x00\x00\x00\x00\x00\x00\x00\x00"
-                      +chr(universe)+"\xD1\x00\x00\x00\x02\x00")
+        self.magic = (b"\x04\x01\xdc\x4a" # magic number
+                      +b"\x01\x00" # kk version
+                      +b"\x08\x01"
+                      +b"\x00\x00\x00\x00\x00\x00\x00\x00"
+                      +chr(universe).encode('utf-8')+b"\xD1\x00\x00\x00\x02\x00")
 
     def send_dmx(self, data) :
         self.sock.send(self.magic+data)
@@ -107,7 +107,7 @@ class RGBLight(object):
 
         if scaledTemp < 66:
             interim = scaledTemp
-            interim = 99.4708025861 * math.log(interim) - 161.1195681661 
+            interim = 99.4708025861 * math.log(interim) - 161.1195681661
             self.g = brightness*min(max(interim, 0.0), 255.0)
         else:
             interim = scaledTemp - 60
@@ -137,12 +137,12 @@ class SimpleLights(object):
     def output(self) :
         out = chr(0x00)
         for i in range(0,128) :
-            out += chr(int(255*min(max(float(self.lights[i][0].r),0),1.0)))
-            out += chr(int(255*min(max(float(self.lights[i][0].g),0),1.0)))
-            out += chr(int(255*min(max(float(self.lights[i][0].b),0),1.0)))
+            out += bytearray([int(255*min(max(float(self.lights[i][0].r),0),1.0))])
+            out += bytearray([int(255*min(max(float(self.lights[i][0].g),0),1.0))])
+            out += bytearray([int(255*min(max(float(self.lights[i][0].b),0),1.0))])
         while(len(out)<512) :
-            out += chr(0x00)
-        out += chr(255)+chr(191)
+            out += b"\x00"
+        out += b"\xff\xbf"
         self.dmx.send_dmx(out)
     def outputAndWait(self, fps) :
         self.output()
@@ -161,7 +161,7 @@ class LightPanel(object):
         self.comp = comp
         self.time = time.time()
     def output(self) :
-        out = chr(0x00)
+        out = b"\x00"
         colors = [0 for i in range(0,500)]
         for c in range(0,6) :
             for r in range(0,12) :
@@ -174,10 +174,10 @@ class LightPanel(object):
                 colors[3*(r+12*c)+self.comp+1]=self.lights[r][c].g
                 colors[3*(r+12*c)+self.comp+2]=self.lights[r][c].b
         for i in range(0,len(colors)) :
-            out+=chr(int(255*min(max(float(colors[i]),0),1.0)))
+            out+=bytearray([int(255*min(max(float(colors[i]),0),1.0))])
         while(len(out)<512) :
-            out+=chr(0x00)
-        out+=chr(255)+chr(191)
+            out+=b"\x00"
+        out+=b"\xff\xbf"
         self.dmx.send_dmx(out)
 
     def outputAndWait(self, fps) :
@@ -256,14 +256,7 @@ class PanelComposite(object):
         self.panels[0].outputAndWait(fps)
 
 def getDefaultPanel() :
-    panel = PanelComposite()
-    for i in range(1,17) :
-        panel_part = HalfLightPanel(sPDS480caConnection("18.224.0.194", i), 1-(i%2))
-        panel.addPanel(panel_part, 12*(1-((i-1)//8)), 6*((i-1)%8))
-    return panel
-
-#def getDefaultPanel() :
-#    return LightPanel(DmxConnection("18.224.1.163", 6038, 0), 0)
+    return LightPanel(DmxConnection("lights-23.mit.edu", 6038, 0), 0)
 
 if __name__=="__main__" :
     a = getDefaultPanel()
@@ -271,7 +264,7 @@ if __name__=="__main__" :
     while True :
         for row in a.lights :
             for light in row :
-                light.r=color
+                light.b=color
                 a.outputAndWait(30)
         for row in a.lights :
             for light in row :
@@ -279,6 +272,6 @@ if __name__=="__main__" :
                 a.outputAndWait(30)
         for row in a.lights :
             for light in row :
-                light.b=color
+                light.r=color
                 a.outputAndWait(30)
         color = 1.0-color
