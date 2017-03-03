@@ -96,6 +96,19 @@ def threshold(threshold=[1.357, 1.25]):
                 yield [i > j for (i, j) in zip(data, threshold)]
     return _threshold
 
+def colorize(gen):
+    states = [2, 1, 0, 0]
+    perm = np.random.permutation(4)
+    rand = random.Random()
+    st = rand.getstate()
+    for data in gen:
+        if data[0]:
+            perm = np.random.permutation(4)
+        if data[1]:
+            rand.seed()
+            st = rand.getstate()
+        yield ([states[i] for i in perm], st)
+
 def traffik(device='/dev/ttyACM0'):
     noop = lambda x: x
     null = lambda x: []
@@ -116,28 +129,19 @@ def traffik(device='/dev/ttyACM0'):
             ser.write(str(bytearray(toSend)))
     def lightMusic(ls):
         constant = [29]
-        many = [30]
         red = [7, 10, 18, 26, 27, 28]
-        yellow = [1, 5, 12, 13, 15, 23]
+        yellow = [1, 5, 12, 13, 15, 23, 30]
         green = [3, 4, 6, 21, 22, 24]
         blue = [2, 9, 14, 16, 17, 25, 31]
-        colors = [many, red, yellow, green, blue]
+        colors = [red, yellow, green, blue]
         lightSwitch(constant + [light for (f, lights) in zip(ls, colors) for light in f(lights)])
     def _traffik(gen):
-        perm = np.random.permutation(4)
-        rand = random.Random()
-        def doflair(ls):
-            st = rand.getstate()
-            ret = rand.choice(ls)
+        for (data, st) in gen:
+            rand = random.Random()
             rand.setstate(st)
-            return [ret]
-        states = [noop, doflair, null, null]
-        for data in gen:
-            if data[0]:
-                perm = np.random.permutation(4)
-            if data[1]:
-                rand.seed()
-            vals = [(noop if data[0] else null)] + [states[i] for i in perm]
+            doflair = lambda x: [rand.choice(x)]
+            states = [null, doflair, noop]
+            vals = [states[i] for i in data]
             lightMusic(vals)
     return _traffik
 
@@ -150,4 +154,4 @@ def composeg(*gens):
         pass
 
 if __name__ == "__main__":
-    composeg(traffik(), threshold(), log, normalize(), diff(), bucket(), psd, micGen(device='hw:1,0,0'))
+    composeg(traffik(), colorize, threshold(), log, normalize(), diff(), bucket(), psd, micGen(device='hw:1,0,0'))
