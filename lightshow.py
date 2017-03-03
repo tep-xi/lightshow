@@ -34,7 +34,7 @@ def psd(gen):
         psd = np.square(np.abs(fftdata))
         yield psd
 
-def bucket(spec=[(0, 0.2), (0.2, 1.0)]):
+def bucket(spec=[(0, 0.25), (0.2, 1.0)]):
     def _bucket(gen):
         for data in gen:
             size = len(data)
@@ -59,7 +59,7 @@ def diff(length=25, degree=2):
             i = (i + 1) % length
     return _diff
 
-def normalize(length=500):
+def normalize(length=50):
     def _normalize(gen):
         init = next(gen)
         running = np.tile(init, (length, 1))
@@ -86,7 +86,7 @@ def log(gen):
         print(outstr)
         yield data
 
-def threshold(threshold=[1.357, 1.25]):
+def threshold(threshold=[1.23, 1.18]):
     def _threshold(gen):
         if len(threshold) == 1:
             for data in gen:
