@@ -8,7 +8,7 @@ KINET_MAGIC=chr(0x04)+chr(0x01)+chr(0xdc)+chr(0x4a)
 KINET_VERSION=chr(0x01)+chr(0x00)
 KINET_TYPE_DMXOUT=chr(0x01)+chr(0x01)
 
-class DmxConnection :
+class DmxConnection(object):
     def __init__(self, address, port, dmx_port) :
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         self.sock.connect((address,port))
@@ -23,10 +23,10 @@ class DmxConnection :
         out+=chr(0xFF)+chr(0xFF)+chr(0xFF)+chr(0xFF) # uni
         out+=data
         if(len(out)!=self.sock.send(out)) :
-            print "socket problem"
+            print("socket problem")
             raise SystemExit(1)
 
-class sPDS480caConnection :
+class sPDS480caConnection(object):
     def __init__(self, address, universe) :
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         self.sock.connect((address, 6038))
@@ -41,14 +41,14 @@ class sPDS480caConnection :
         self.sock.send(self.magic+data)
         # no error detection! yay!
 
-class RGBLight :
+class RGBLight(object):
     def __init__(self, row, col) :
         self.r = 0
         self.g = 0
         self.b = 0
         self.row = row
         self.col = col
-    
+
     # h,s,b are from 0 to 1
     def sethue(self, hue, brightness, saturation) :
         angle = hue*6%6.0
@@ -94,41 +94,40 @@ class RGBLight :
     # http://www.tannerhelland.com/4435/convert-temperature-rgb-algorithm-code/ 
     # - sinback 2015
     def settemp(self, temperature, brightness) :
-	# brightness a float between [0, 1]
-	brightness = min(max(brightness, 0.0), 1.0)
-	temperature = min(max(temperature, 1000.0), 40000.0)
-	scaledTemp = temperature/100.0
-	if scaledTemp < 66:
-		self.r = brightness*255.0
-	else:
-		interim = scaledTemp - 60
-		interim = 329.698727446 * (interim ** -0.1332047592)
-		self.r = brightness*min(max(interim, 0.0), 255.0)
+        # brightness a float between [0, 1]
+        brightness = min(max(brightness, 0.0), 1.0)
+        temperature = min(max(temperature, 1000.0), 40000.0)
+        scaledTemp = temperature/100.0
+        if scaledTemp < 66:
+            self.r = brightness*255.0
+        else:
+            interim = scaledTemp - 60
+            interim = 329.698727446 * (interim ** -0.1332047592)
+            self.r = brightness*min(max(interim, 0.0), 255.0)
 
-	if scaledTemp < 66:
-		interim = scaledTemp
-		interim = 99.4708025861 * math.log(interim) - 161.1195681661 
-		self.g = brightness*min(max(interim, 0.0), 255.0)
-	else:
-		interim = scaledTemp - 60
-		interim = 288.1221695283 * (interim ** -0.0755148492) 	
-		self.g = brightness*min(max(interim, 0.0), 255.0)
+        if scaledTemp < 66:
+            interim = scaledTemp
+            interim = 99.4708025861 * math.log(interim) - 161.1195681661 
+            self.g = brightness*min(max(interim, 0.0), 255.0)
+        else:
+            interim = scaledTemp - 60
+            interim = 288.1221695283 * (interim ** -0.0755148492)
+            self.g = brightness*min(max(interim, 0.0), 255.0)
 
-	if scaledTemp >= 66:
-		self.b = brightness*255.0
-	elif scaledTemp <= 19:
-		self.b = brightness*0.0
-	else:
-		interim = scaledTemp - 10
-		interim = 138.5177312231 * math.log(interim) - 305.0447927307 
-		self.b = brightness*min(max(interim, 0.0), 255.0)
+        if scaledTemp >= 66:
+            self.b = brightness*255.0
+        elif scaledTemp <= 19:
+            self.b = brightness*0.0
+        else:
+            interim = scaledTemp - 10
+            interim = 138.5177312231 * math.log(interim) - 305.0447927307 
+            self.b = brightness*min(max(interim, 0.0), 255.0)
 
-	self.r = self.r/255.0
-	self.g = self.g/255.0
-	self.b = self.b/255.0
-	
+        self.r = self.r/255.0
+        self.g = self.g/255.0
+        self.b = self.b/255.0
 
-class SimpleLights :
+class SimpleLights(object):
     def __init__(self, dmx) :
         self.lights = [[RGBLight(j, 0)] for j in range(0, 128)]
         self.dmx = dmx
@@ -151,8 +150,8 @@ class SimpleLights :
         if(1.0/fps > endtime) :
             time.sleep(1.0/fps-endtime)
         self.time = time.time()
-        
-class LightPanel :
+
+class LightPanel(object):
     def __init__(self, dmx, comp) :
         self.lights = [[RGBLight(j, i) for i in range(0,12)]
                        for j in range(0,12)]
@@ -188,7 +187,7 @@ class LightPanel :
             time.sleep(1.0/fps-endtime)
         self.time = time.time()
 
-class HalfLightPanel :
+class HalfLightPanel(object):
     # direction: 0 is "bottom right corner is (0,0)" and 1 is "bottom left ..."
     def __init__(self, dmx, direction) :
         self.width = 6
@@ -223,7 +222,7 @@ class HalfLightPanel :
             time.sleep(1.0/fps-endtime)
         self.time = time.time()
 
-class PanelComposite :
+class PanelComposite(object):
     def __init__(self) :
         self.panels = []
         self.panelloc = []
