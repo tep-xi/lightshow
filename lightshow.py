@@ -90,10 +90,10 @@ def threshold(threshold=[1.23, 1.18]):
     def _threshold(gen):
         if len(threshold) == 1:
             for data in gen:
-                yield [i > threshold[0] for i in data]
+                yield [i - threshold[0] for i in data]
         else:
             for data in gen:
-                yield [i > j for (i, j) in zip(data, threshold)]
+                yield [i - j for (i, j) in zip(data, threshold)]
     return _threshold
 
 def colorize(gen):
@@ -102,9 +102,9 @@ def colorize(gen):
     rand = random.Random()
     st = rand.getstate()
     for data in gen:
-        if data[0]:
+        if data[0] > 0:
             perm = np.random.permutation(4)
-        if data[1]:
+        if data[1] > 0:
             rand.seed()
             st = rand.getstate()
         yield ([states[i] for i in perm], st)
@@ -115,7 +115,7 @@ def traffik(device='/dev/ttyACM0'):
     ser = serial.Serial(device, 19200, timeout=1)
     def lightSwitch(numbers=None):
         toSend = [0b00000000, ] * 4
-        if numbers:
+        if numbers is not None:
             for light in numbers:
                 if light >= 0 and light < 32:
                     pos = light % 8
@@ -125,8 +125,7 @@ def traffik(device='/dev/ttyACM0'):
                     toSend = [0b00000000, ] * 4
         else:
             toSend = [0b00000000, ] * 4
-        if ser is not None:
-            ser.write(str(bytearray(toSend)))
+        ser.write(str(bytearray(toSend)))
     def lightMusic(ls):
         constant = [29]
         red = [7, 10, 18, 26, 27, 28]
@@ -136,14 +135,41 @@ def traffik(device='/dev/ttyACM0'):
         colors = [red, yellow, green, blue]
         lightSwitch(constant + [light for (f, lights) in zip(ls, colors) for light in f(lights)])
     def _traffik(gen):
-        for (data, st) in gen:
-            rand = random.Random()
-            rand.setstate(st)
-            doflair = lambda x: [rand.choice(x)]
-            states = [null, doflair, noop]
-            vals = [states[i] for i in data]
-            lightMusic(vals)
+        try:
+            for (data, st) in gen:
+                rand = random.Random()
+                rand.setstate(st)
+                doflair = lambda x: [rand.choice(x)]
+                states = [null, doflair, noop]
+                vals = [states[i] for i in data]
+                lightMusic(vals)
+        finally:
+            lightSwitch()
     return _traffik
+
+def hue(bridge='hue', password=None, lobri=16, groups=[[1,2,3],[4,5],[6]]):
+    from qhue import Bridge
+    from threading import Thread
+    if password is None:
+        from appdirs import user_config_dir
+        passfile = open(user_config_dir(roaming=True) + '/huekey', 'r')
+        password = passfile.read().strip()
+        passfile.close()
+    br = Bridge(bridge, password)
+    br.groups[0].action(effect='colorloop', bri=lobri)
+    def huego(light, hibri):
+        br.lights[light].state(transitiontime=0, sat=255, bri=hibri)
+        br.lights[light].state(transitiontime=1, sat=255, bri=lobri)
+    def _hue(gen):
+        try:
+            for data in gen:
+                if data[0] > 0:
+                    light = random.choice(random.choice(groups))
+                    bri = 127 + int(np.clip(127 * np.log(data[0]), 0, 128))
+                    Thread(target=huego, args=(light, bri)).start()
+        finally:
+            br.groups[0].action(effect='none')
+    return _hue
 
 def composeg(*gens):
     rev = list(reversed(gens))
@@ -153,5 +179,18 @@ def composeg(*gens):
     for data in chain:
         pass
 
+"""
+we specify a DAG as a list of vertices along with a list of lists of indices
+corresponding to directed edges, where edges[i] can contain j only if i < j
+"""
+def composedag(vertices, edges):
+    pass
+
 if __name__ == "__main__":
-    composeg(traffik(), colorize, threshold(), log, normalize(), diff(), bucket(), psd, micGen(device='hw:1,0,0'))
+    from sys import argv
+    if len(argv) <= 1:
+        composeg(traffik(), colorize, threshold(), normalize(), diff(), bucket(), psd, micGen(device='hw:1,0,0'))
+    elif argv[1] == 'verbose':
+        composeg(traffik(), colorize, threshold(), log, normalize(), diff(), bucket(), psd, micGen(device='hw:1,0,0'))
+    elif argv[1] == 'hue':
+        composeg(hue(), threshold(), log, normalize(), diff(), bucket(), psd, micGen())
