@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 
-import alsaaudio as aa
 import numpy as np
-import struct
-import serial
 import random
 
 def micGen(device=None, rate=8000, periodFrames=170, numPeriods=2):
+    import alsaaudio as aa
+    import struct
     if device is not None:
         inp = aa.PCM(aa.PCM_CAPTURE, card=device)
     else:
@@ -110,9 +109,10 @@ def colorize(gen):
         yield ([states[i] for i in perm], st)
 
 def traffik(device='/dev/ttyACM0'):
+    from serial import Serial
     noop = lambda x: x
     null = lambda x: []
-    ser = serial.Serial(device, 19200, timeout=1)
+    ser = Serial(device, 19200, timeout=1)
     def lightSwitch(numbers=None):
         toSend = [0b00000000, ] * 4
         if numbers is not None:
