@@ -3,7 +3,7 @@
 import numpy as np
 import random
 
-def micGen(device=None, rate=8000, periodFrames=170, numPeriods=2):
+def micGen(device=None, rate=8000, periodFrames=170, numPeriods=4):
     import alsaaudio as aa
     import struct
     if device is not None:
@@ -33,16 +33,21 @@ def psd(gen):
         psd = np.square(np.abs(fftdata))
         yield psd
 
-def bucket(spec=[(0, 0.25), (0.2, 1.0)]):
+def bucket(spec=[[((0, 0.25), 0.80), ((0, 0.5), 0.20), ((0.25, 1), 0.125)], [((0.2, 1.0), 1)], [((0.,1.), 1)]]):
     def _bucket(gen):
         for data in gen:
             size = len(data)
-            indices = [(int(size*i), int(size*j)) for (i, j) in spec]
-            buckets = [np.sum(data[i:j]) for (i, j) in indices]
+            buckets = []
+            for ls in spec:
+                tot = 0
+                for ((ii, jj), r) in ls:
+                    i, j = int(size*ii), int(size*jj)
+                    tot += r * np.sum(data[i:j])
+                buckets += [tot]
             yield buckets
     return _bucket
 
-def diff(length=25, degree=2):
+def diff(length=12, degree=2):
     def _diff(gen):
         init = next(gen)
         xvals = (np.arange(0, length*2 - 1) % length) - (length - 1)
@@ -58,12 +63,10 @@ def diff(length=25, degree=2):
             i = (i + 1) % length
     return _diff
 
-def normalize(length=50):
+def normalize(length=32):
     def _normalize(gen):
         init = next(gen)
         running = np.tile(init, (length, 1))
-#       for i in range(2, length - 1):
-#           running[i, :] = next(gen)
         i = 0
         for data in gen:
             running[i, :] = data
@@ -85,14 +88,11 @@ def log(gen):
         print(outstr)
         yield data
 
-def threshold(threshold=[1.23, 1.18]):
+def threshold(threshold=[1.04, 1.1, 1.5]):
+    from itertools import cycle
     def _threshold(gen):
-        if len(threshold) == 1:
-            for data in gen:
-                yield [i - threshold[0] for i in data]
-        else:
-            for data in gen:
-                yield [i - j for (i, j) in zip(data, threshold)]
+        for data in gen:
+            yield [i - j for (i, j) in zip(data, cycle(threshold))]
     return _threshold
 
 def colorize(gen):
@@ -135,9 +135,9 @@ def traffik(device='/dev/ttyACM0'):
         colors = [red, yellow, green, blue]
         lightSwitch(constant + [light for (f, lights) in zip(ls, colors) for light in f(lights)])
     def _traffik(gen):
+        rand = random.Random()
         try:
             for (data, st) in gen:
-                rand = random.Random()
                 rand.setstate(st)
                 doflair = lambda x: [rand.choice(x)]
                 states = [null, doflair, noop]
@@ -146,6 +146,37 @@ def traffik(device='/dev/ttyACM0'):
         finally:
             lightSwitch()
     return _traffik
+
+def tubes(address='lights-24.mit.edu', port=6038):
+    import dmx
+    import colorsys as cl
+    tube = dmx.LightPanel(dmx.DmxConnection(address, port, 0), 0)
+    def _tubes(gen):
+        rand = random.Random()
+        for (data, st, bass, total) in gen:
+            rand.setstate(st)
+            r = rand.random() ** 4
+            red = np.array([1,0,0])
+            ylo = np.array([1,1,0])
+            grn = np.array([0,1,0])
+            blu = np.array([0,0,1])
+            colors = [red, ylo, grn, blu]
+            rgb = np.sum([color * (1-r if state == 2 else r if state == 1 else 0) for (color, state) in zip(colors, data)], axis=0)
+            hue = cl.rgb_to_hsv(*rgb)[0]
+            sat = (1 + np.clip(np.exp(bass), 0, 1))/2
+            val = (1 + 2*np.clip(np.exp(total), 0, 1))/3
+            out = cl.hsv_to_rgb(hue, sat, val)
+            for row in tube.lights:
+                for light in row:
+                    light.r = out[0]
+                    light.g = out[1]
+                    light.b = out[2]
+            out = cl.hsv_to_rgb((hue + 0.5) % 1, sat, val)
+            tube.lights[11][4].r = out[0]
+            tube.lights[11][4].g = out[1]
+            tube.lights[11][4].b = out[2]
+            tube.output()
+    return _tubes
 
 def hue(bridge='hue', password=None, lobri=16, groups=[[1,2,3],[4,5],[6]]):
     from qhue import Bridge
